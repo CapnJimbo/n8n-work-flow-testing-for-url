@@ -6,7 +6,8 @@
         "httpMethod": "POST",
         "path": "testinggithub",
         "responseMode": "lastNode",
-        "options": {}
+        "options": {},
+        "webhookId": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
       },
       "id": "Webhook_Trigger",
       "name": "Webhook In",
@@ -34,13 +35,7 @@
       "name": "ChatGPT Add Numbers",
       "type": "n8n-nodes-base.openAi",
       "typeVersion": 1,
-      "position": [700, 300],
-      "credentials": {
-        "openAiApi": {
-          "id": "your-openai-credential-id",
-          "name": "OpenAI API"
-        }
-      }
+      "position": [700, 300]
     },
     {
       "parameters": {
@@ -54,14 +49,7 @@
     },
     {
       "parameters": {
-        "responseData": {
-          "values": [
-            {
-              "name": "reply",
-              "value": "={{ $json.reply }}"
-            }
-          ]
-        }
+        "responseData": "={{ { \"reply\": $json.reply } }}"
       },
       "id": "Webhook_Response",
       "name": "Respond to Webhook",
@@ -70,6 +58,7 @@
       "position": [1100, 300]
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook In": {
       "main": [
@@ -116,6 +105,12 @@
       ]
     }
   },
-  "active": true
+  "active": true,
+  "settings": {},
+  "versionId": "12345678-90ab-cdef-1234-567890abcdef",
+  "id": "87654321-0fed-cba9-8765-4321098765fe",
+  "meta": {
+    "instanceId": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6"
+  },
+  "tags": []
 }
-
