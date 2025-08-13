@@ -1,1 +1,121 @@
+{
+  "name": "Testing GitHub Calculator with Memory",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testinggithub",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "Webhook_Trigger",
+      "name": "Webhook In",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const sessionId = $json.sessionId || \"default\";\nconst num1 = parseFloat($json.num1);\nconst num2 = parseFloat($json.num2);\n\nif (isNaN(num1) || isNaN(num2)) {\n  return [{ json: { error: \"Both num1 and num2 must be valid numbers.\" } }];\n}\n\nconst store = $getWorkflowStaticData('global');\nconst history = store[sessionId] || [];\n\nreturn [{\n  json: {\n    messages: [\n      ...history,\n      { role: \"user\", content: `Add ${num1} and ${num2}` }\n    ],\n    sessionId,\n    num1,\n    num2\n  }\n}];"
+      },
+      "id": "Prepare_Memory",
+      "name": "Prepare Memory & Numbers",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "messages": "={{ $json[\"messages\"] }}"
+      },
+      "id": "ChatGPT",
+      "name": "ChatGPT Add Numbers",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "your-openai-credential-id",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const sessionId = $json.sessionId;\nconst reply = $json.data[0].message.content;\nconst store = $getWorkflowStaticData('global');\n\nstore[sessionId] = [\n  ...($getWorkflowStaticData('global')[sessionId] || []),\n  { role: \"user\", content: `Add ${$json.num1} and ${$json.num2}` },\n  { role: \"assistant\", content: reply }\n];\n\nreturn [{ json: { reply } }];"
+      },
+      "id": "Save_Memory",
+      "name": "Save Memory & Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "responseData": {
+          "values": [
+            {
+              "name": "reply",
+              "value": "={{ $json.reply }}"
+            }
+          ]
+        }
+      },
+      "id": "Webhook_Response",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook In": {
+      "main": [
+        [
+          {
+            "node": "Prepare Memory & Numbers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Memory & Numbers": {
+      "main": [
+        [
+          {
+            "node": "ChatGPT Add Numbers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ChatGPT Add Numbers": {
+      "main": [
+        [
+          {
+            "node": "Save Memory & Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Memory & Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true
+}
 
