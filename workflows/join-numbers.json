@@ -1,61 +1,39 @@
 {
-  "name": "Testing GitHub Calculator with Memory",
+  "name": "Simple Number Calculator",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "testinggithub",
         "responseMode": "lastNode",
-        "options": {},
-        "webhookId": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
+        "options": {}
       },
-      "id": "Webhook_Trigger",
+      "id": "b8c7d4e5-f6g7-h8i9-j0k1-l2m3n4o5p6q7",
       "name": "Webhook In",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [300, 300]
+      "position": [300, 300],
+      "webhookId": "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
     },
     {
       "parameters": {
-        "functionCode": "const sessionId = $json.sessionId || \"default\";\nconst num1 = parseFloat($json.num1);\nconst num2 = parseFloat($json.num2);\n\nif (isNaN(num1) || isNaN(num2)) {\n  return [{ json: { error: \"Both num1 and num2 must be valid numbers.\" } }];\n}\n\nconst store = $getWorkflowStaticData('global');\nconst history = store[sessionId] || [];\n\nreturn [{\n  json: {\n    messages: [\n      ...history,\n      { role: \"user\", content: `Add ${num1} and ${num2}` }\n    ],\n    sessionId,\n    num1,\n    num2\n  }\n}];"
+        "functionCode": "// Debug: Log the incoming data\nconsole.log('Incoming data:', $json);\n\n// Get input numbers - handle both direct and nested data\nlet num1, num2;\n\nif ($json.body && typeof $json.body === 'object') {\n  // Data is in body (common with webhooks)\n  num1 = parseFloat($json.body.num1);\n  num2 = parseFloat($json.body.num2);\n} else {\n  // Data is direct\n  num1 = parseFloat($json.num1);\n  num2 = parseFloat($json.num2);\n}\n\n// Validate inputs\nif (isNaN(num1) || isNaN(num2)) {\n  return [{ \n    json: { \n      error: \"Both num1 and num2 must be valid numbers.\",\n      debug: {\n        receivedData: $json,\n        parsedNum1: num1,\n        parsedNum2: num2,\n        num1IsNaN: isNaN(num1),\n        num2IsNaN: isNaN(num2)\n      }\n    } \n  }];\n}\n\n// Calculate the sum\nconst result = num1 + num2;\n\n// Return the result\nreturn [{\n  json: {\n    result: result,\n    calculation: `${num1} + ${num2} = ${result}`,\n    inputs: {\n      num1: num1,\n      num2: num2\n    },\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
-      "id": "Prepare_Memory",
-      "name": "Prepare Memory & Numbers",
+      "id": "c9d8e7f6-g5h4-i3j2-k1l0-m9n8o7p6q5r4",
+      "name": "Add Numbers",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [500, 300]
     },
     {
       "parameters": {
-        "resource": "chat",
-        "model": "gpt-4o-mini",
-        "messages": "={{ $json[\"messages\"] }}"
+        "responseData": "={{ $json }}"
       },
-      "id": "ChatGPT",
-      "name": "ChatGPT Add Numbers",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 1,
-      "position": [700, 300]
-    },
-    {
-      "parameters": {
-        "functionCode": "const sessionId = $json.sessionId;\nconst reply = $json.data[0].message.content;\nconst store = $getWorkflowStaticData('global');\n\nstore[sessionId] = [\n  ...($getWorkflowStaticData('global')[sessionId] || []),\n  { role: \"user\", content: `Add ${$json.num1} and ${$json.num2}` },\n  { role: \"assistant\", content: reply }\n];\n\nreturn [{ json: { reply } }];"
-      },
-      "id": "Save_Memory",
-      "name": "Save Memory & Reply",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
-      "position": [900, 300]
-    },
-    {
-      "parameters": {
-        "responseData": "={{ { \"reply\": $json.reply } }}"
-      },
-      "id": "Webhook_Response",
+      "id": "d8c7b6a5-f4g3-h2i1-j0k9-l8m7n6o5p4q3",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1100, 300]
+      "position": [700, 300]
     }
   ],
   "pinData": {},
@@ -64,36 +42,14 @@
       "main": [
         [
           {
-            "node": "Prepare Memory & Numbers",
+            "node": "Add Numbers",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Memory & Numbers": {
-      "main": [
-        [
-          {
-            "node": "ChatGPT Add Numbers",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "ChatGPT Add Numbers": {
-      "main": [
-        [
-          {
-            "node": "Save Memory & Reply",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save Memory & Reply": {
+    "Add Numbers": {
       "main": [
         [
           {
