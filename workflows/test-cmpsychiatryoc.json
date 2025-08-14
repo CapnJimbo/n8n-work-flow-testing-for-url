@@ -1,113 +1,156 @@
 {
-  "name": "Shift Schedule Summary",
+  "name": "Webhook → Airtable → OpenAI → Webhook Response",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "testcmpsychitaryoc",
-        "responseMode": "onReceived",
+        "responseMode": "lastNode",
         "options": {}
       },
-      "id": "WebhookNode",
-      "name": "Webhook",
+      "id": "Webhook_Trigger",
+      "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
-      "typeVersion": 1,
-      "position": [250, 300]
+      "typeVersion": 1
     },
     {
       "parameters": {
-        "model": "gpt-3.5-turbo",
+        "functionCode": "const user = $json.users[0];\nconst leave = user.leave_submissions[0] || {};\nconst prefs = user.working_preferences || {};\n\nreturn [{\n  requestId: $json.requestId,\n  full_name: user.full_name,\n  role: user.role,\n  leave_type: leave.leave_type,\n  leave_start: leave.start_date,\n  leave_end: leave.end_date,\n  duration_days: leave.duration_days,\n  flexible_nights: prefs.flexible_nights,\n  preferred_nights: (prefs.preferred_nights || []).join(\", \"),\n  avoid_nights: (prefs.avoid_nights || []).join(\", \"),\n  prioritise: prefs.prioritise,\n  exempted_from_on_call: prefs.exempted_from_on_call,\n  max_shifts_per_month: prefs.max_shifts_per_month,\n  rota_start: $json.rotaDates.start,\n  rota_end: $json.rotaDates.end,\n  requestedAt: $json.requestedAt,\n  callbackUrl: $json.callbackUrl\n}];"
+      },
+      "id": "Flatten_JSON",
+      "name": "Flatten JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "application": "appXXXXXXXXXXXXXX",
+        "table": "RotaData",
+        "fields": {
+          "Full Name": "={{$json[\"full_name\"]}}",
+          "Role": "={{$json[\"role\"]}}",
+          "Leave Type": "={{$json[\"leave_type\"]}}",
+          "Leave Start": "={{$json[\"leave_start\"]}}",
+          "Leave End": "={{$json[\"leave_end\"]}}",
+          "Duration Days": "={{$json[\"duration_days\"]}}",
+          "Flexible Nights": "={{$json[\"flexible_nights\"]}}",
+          "Preferred Nights": "={{$json[\"preferred_nights\"]}}",
+          "Avoid Nights": "={{$json[\"avoid_nights\"]}}",
+          "Prioritise": "={{$json[\"prioritise\"]}}",
+          "Exempted From On Call": "={{$json[\"exempted_from_on_call\"]}}",
+          "Max Shifts Per Month": "={{$json[\"max_shifts_per_month\"]}}",
+          "Rota Start": "={{$json[\"rota_start\"]}}",
+          "Rota End": "={{$json[\"rota_end\"]}}",
+          "Requested At": "={{$json[\"requestedAt\"]}}",
+          "Callback URL": "={{$json[\"callbackUrl\"]}}"
+        }
+      },
+      "id": "Airtable_Create",
+      "name": "Airtable Create",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "credentials": {
+        "airtableApi": "Airtable API"
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "application": "appXXXXXXXXXXXXXX",
+        "table": "RotaData",
+        "options": {}
+      },
+      "id": "Airtable_Fetch",
+      "name": "Airtable Fetch",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "credentials": {
+        "airtableApi": "Airtable API"
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "mode": "chat",
         "messages": [
           {
             "role": "system",
-            "content": "You are a scheduling assistant. Summarize the incoming JSON data and format it in a readable table."
+            "content": "You are a rota scheduling assistant. Given staff data from Airtable, output a JSON schedule in the exact format provided by the user."
           },
           {
             "role": "user",
-            "content": "{{$json}}"
+            "content": "Staff Data:\n{{$json}}\n\nPlease generate a schedule in JSON format with the fields:\n{\n  \"requestId\": \"uuid\",\n  \"success\": true,\n  \"scheduleData\": {\n    \"month\": \"December\",\n    \"year\": 2024,\n    \"shifts\": [ {\"date\": \"YYYY-MM-DD\", \"consultant\": \"\", \"seniorRegistrar\": \"\", \"registrar\": \"\", \"donAdon\": \"\" } ]\n  },\n  \"metadata\": { \"processedAt\": \"ISO timestamp\", \"aiModel\": \"gpt-4\", \"confidence\": 0.95 }\n}\n"
           }
         ]
       },
-      "id": "OpenAINode",
-      "name": "ChatGPT Summary",
-      "type": "n8n-nodes-base.openai",
+      "id": "OpenAI_Analysis",
+      "name": "OpenAI Analysis",
+      "type": "n8n-nodes-base.openAi",
       "typeVersion": 1,
-      "position": [500, 300],
       "credentials": {
-        "openAIApi": "Your OpenAI API Key"
+        "openAiApi": "OpenAI API"
       }
     },
     {
       "parameters": {
-        "binaryPropertyName": "data",
-        "fileName": "shift-summary.docx",
-        "options": {}
+        "functionCode": "const aiOutput = $json;\nreturn [ aiOutput ];"
       },
-      "id": "WordNode",
-      "name": "Generate Word Document",
-      "type": "n8n-nodes-base.word",
-      "typeVersion": 1,
-      "position": [750, 300]
-    },
-    {
-      "parameters": {
-        "fromEmail": "you@example.com",
-        "toEmail": "recipient@example.com",
-        "subject": "n8n Response",
-        "text": "Here is the Word document generated by n8n.",
-        "attachments": [
-          {
-            "binaryPropertyName": "data",
-            "fileName": "shift-summary.docx",
-            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          }
-        ]
-      },
-      "id": "EmailNode",
-      "name": "Send Email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 1,
-      "position": [1000, 300],
-      "credentials": {
-        "smtp": "Your SMTP Credentials"
-      }
+      "id": "Format_Response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1
     }
   ],
   "connections": {
-    "Webhook": {
+    "Webhook_Trigger": {
       "main": [
         [
           {
-            "node": "ChatGPT Summary",
+            "node": "Flatten_JSON",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "ChatGPT Summary": {
+    "Flatten_JSON": {
       "main": [
         [
           {
-            "node": "Generate Word Document",
+            "node": "Airtable_Create",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Airtable_Fetch",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generate Word Document": {
+    "Airtable_Fetch": {
       "main": [
         [
           {
-            "node": "Send Email",
+            "node": "OpenAI_Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI_Analysis": {
+      "main": [
+        [
+          {
+            "node": "Format_Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  },
-  "active": true,
-  "settings": {}
+  }
 }
