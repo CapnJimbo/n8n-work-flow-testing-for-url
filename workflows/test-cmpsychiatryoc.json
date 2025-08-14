@@ -1,12 +1,11 @@
 {
-  "name": "Oncall Rota AI Generator",
+  "name": "Oncall Schedule Workflow",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "testcmpsychitaryoc",
-        "responseMode": "lastNode",
-        "options": {}
+        "responseMode": "lastNode"
       },
       "id": "1",
       "name": "Webhook Trigger",
@@ -16,10 +15,10 @@
     },
     {
       "parameters": {
-        "functionCode": "const user = $json.users[0] || {};\nconst leave = (user.leave_submissions && user.leave_submissions[0]) || {};\nconst prefs = user.working_preferences || {};\n\nreturn [{\n  requestId: $json.requestId,\n  full_name: user.full_name,\n  role: user.role,\n  leave_type: leave.leave_type,\n  leave_start: leave.start_date,\n  leave_end: leave.end_date,\n  duration_days: leave.duration_days,\n  flexible_nights: prefs.flexible_nights,\n  preferred_nights: (prefs.preferred_nights || []).join(\", \"),\n  avoid_nights: (prefs.avoid_nights || []).join(\", \"),\n  prioritise: prefs.prioritise,\n  exempted_from_on_call: prefs.exempted_from_on_call,\n  max_shifts_per_month: prefs.max_shifts_per_month,\n  rota_start: $json.rotaDates.start,\n  rota_end: $json.rotaDates.end,\n  requestedAt: $json.requestedAt,\n  callbackUrl: $json.callbackUrl\n}];"
+        "functionCode": "const input = items[0].json;\n\n// Flatten JSON for Airtable\nconst user = input.users[0];\nconst leave = user.leave_submissions?.[0] || {};\n\nreturn [{\n  json: {\n    requestId: input.requestId,\n    full_name: user.full_name,\n    role: user.role,\n    leave_type: leave.leave_type || null,\n    leave_start: leave.start_date || null,\n    leave_end: leave.end_date || null,\n    duration_days: leave.duration_days || null,\n    flexible_nights: user.working_preferences?.flexible_nights || false,\n    preferred_nights: (user.working_preferences?.preferred_nights || []).join(\", \"),\n    avoid_nights: (user.working_preferences?.avoid_nights || []).join(\", \"),\n    prioritise: user.working_preferences?.prioritise || false,\n    exempted_from_on_call: user.working_preferences?.exempted_from_on_call || false,\n    max_shifts_per_month: user.working_preferences?.max_shifts_per_month || null,\n    rota_start: input.rotaDates?.start || null,\n    rota_end: input.rotaDates?.end || null,\n    requestedAt: input.requestedAt\n  }\n}];"
       },
       "id": "2",
-      "name": "Flatten JSON",
+      "name": "Prepare Airtable Data",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [500, 300]
@@ -27,9 +26,11 @@
     {
       "parameters": {
         "operation": "create",
-        "application": "appYOUR_BASE_ID",
-        "table": "RotaData",
+        "application": "",
+        "table": "ShiftRequests",
+        "options": {},
         "fields": {
+          "Request ID": "={{$json[\"requestId\"]}}",
           "Full Name": "={{$json[\"full_name\"]}}",
           "Role": "={{$json[\"role\"]}}",
           "Leave Type": "={{$json[\"leave_type\"]}}",
@@ -40,69 +41,66 @@
           "Preferred Nights": "={{$json[\"preferred_nights\"]}}",
           "Avoid Nights": "={{$json[\"avoid_nights\"]}}",
           "Prioritise": "={{$json[\"prioritise\"]}}",
-          "Exempted From On Call": "={{$json[\"exempted_from_on_call\"]}}",
+          "Exempted from On Call": "={{$json[\"exempted_from_on_call\"]}}",
           "Max Shifts Per Month": "={{$json[\"max_shifts_per_month\"]}}",
           "Rota Start": "={{$json[\"rota_start\"]}}",
           "Rota End": "={{$json[\"rota_end\"]}}",
-          "Requested At": "={{$json[\"requestedAt\"]}}",
-          "Callback URL": "={{$json[\"callbackUrl\"]}}"
+          "Requested At": "={{$json[\"requestedAt\"]}}"
         }
       },
       "id": "3",
-      "name": "Airtable Create",
+      "name": "Save to Airtable",
       "type": "n8n-nodes-base.airtable",
       "typeVersion": 1,
       "position": [750, 300],
       "credentials": {
-        "airtableApi": "Airtable API"
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable API"
+        }
       }
     },
     {
       "parameters": {
         "operation": "list",
-        "application": "appYOUR_BASE_ID",
-        "table": "RotaData",
+        "table": "ShiftRequests",
         "options": {}
       },
       "id": "4",
-      "name": "Airtable Fetch",
+      "name": "Fetch All Requests",
       "type": "n8n-nodes-base.airtable",
       "typeVersion": 1,
       "position": [1000, 300],
       "credentials": {
-        "airtableApi": "Airtable API"
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable API"
+        }
       }
     },
     {
       "parameters": {
-        "model": "gpt-4o-mini",
-        "mode": "chat",
-        "messages": [
-          {
-            "role": "system",
-            "content": "You are a rota scheduling assistant. Given staff data from Airtable, output a JSON schedule in the exact format provided by the user."
-          },
-          {
-            "role": "user",
-            "content": "Staff Data:\n{{$json}}\n\nGenerate JSON in this exact structure:\n{\n  \"requestId\": \"uuid\",\n  \"success\": true,\n  \"scheduleData\": {\n    \"month\": \"December\",\n    \"year\": 2024,\n    \"shifts\": [ {\"date\": \"YYYY-MM-DD\", \"consultant\": \"\", \"seniorRegistrar\": \"\", \"registrar\": \"\", \"donAdon\": \"\" } ]\n  },\n  \"metadata\": { \"processedAt\": \"ISO timestamp\", \"aiModel\": \"gpt-4\", \"confidence\": 0.95 }\n}"
-          }
-        ]
+        "model": "gpt-4",
+        "prompt": "You are an AI scheduling assistant. Based on the following shift requests and preferences, generate a preview December 2024 on-call rota in JSON format with consultant, seniorRegistrar, registrar, donAdon for each date between rota_start and rota_end.\n\nData:\n{{$json}}"
       },
       "id": "5",
-      "name": "OpenAI Analysis",
+      "name": "OpenAI - Generate Schedule",
       "type": "n8n-nodes-base.openAi",
       "typeVersion": 1,
       "position": [1250, 300],
       "credentials": {
-        "openAiApi": "OpenAI API"
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
       }
     },
     {
       "parameters": {
-        "functionCode": "const aiOutput = $json;\nreturn [ aiOutput ];"
+        "functionCode": "const aiOutput = items[0].json;\nconst now = new Date().toISOString();\nreturn [{\n  json: {\n    requestId: $items(\"Webhook Trigger\")[0].json.requestId,\n    success: true,\n    scheduleData: aiOutput.scheduleData || {},\n    metadata: {\n      processedAt: now,\n      aiModel: \"gpt-4\",\n      confidence: aiOutput.confidence || 0.95\n    }\n  }\n}];"
       },
       "id": "6",
-      "name": "Format Response",
+      "name": "Format Webhook Response",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [1500, 300]
@@ -112,54 +110,37 @@
     "Webhook Trigger": {
       "main": [
         [
-          {
-            "node": "Flatten JSON",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Prepare Airtable Data", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Flatten JSON": {
+    "Prepare Airtable Data": {
       "main": [
         [
-          {
-            "node": "Airtable Create",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Airtable Fetch",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Save to Airtable", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Airtable Fetch": {
+    "Save to Airtable": {
       "main": [
         [
-          {
-            "node": "OpenAI Analysis",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "Fetch All Requests", "type": "main", "index": 0 }
         ]
       ]
     },
-    "OpenAI Analysis": {
+    "Fetch All Requests": {
       "main": [
         [
-          {
-            "node": "Format Response",
-            "type": "main",
-            "index": 0
-          }
+          { "node": "OpenAI - Generate Schedule", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI - Generate Schedule": {
+      "main": [
+        [
+          { "node": "Format Webhook Response", "type": "main", "index": 0 }
         ]
       ]
     }
-  },
-  "active": false,
-  "settings": {},
-  "versionId": "v1"
+  }
 }
